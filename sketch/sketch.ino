@@ -318,6 +318,7 @@ void changeGameState(gameStates newState) {
       break;
     case OPTIONS:
       noTone(PIN_SPEAKER);
+      stopLeds();
       u8x8.clear();
       u8x8.setFont(u8x8_font_chroma48medium8_r);
       u8x8.drawString(0,0,"OPTIONS");
