@@ -18,7 +18,8 @@ enum gameStates {
                   PLAYER_WAITING,
                   GAME_OVER,
                   OPTIONS,
-                  OPTIONS_ASK_RESET
+                  OPTIONS_ASK_RESET,
+                  OPTIONS_ASK_SOUND
                 };
 
 
@@ -51,6 +52,7 @@ U8X8_SSD1306_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
 
 uint8_t record;
 
+bool sound;
 
 void setup() {
   Wire.begin();
@@ -72,24 +74,32 @@ void setup() {
 
   changeGameState(LOBBY);
 
+  sound = true;
+
   delay(100);
 }
 
 void loop() {
   
+  //consuming button reading
   readButtons();
-  
-  // if (areAllButtonPressed() && gameState != OPTIONS) {
-  //   changeGameState(OPTIONS);
-  // }
+
+  //lowlevel button reading
+  if (areAllButtonPressed() && gameState != OPTIONS) {
+    resetButtonStates();
+    changeGameState(OPTIONS);
+  }
 
   switch (gameState) {
     case OPTIONS:
       if (isButtonPressed(3)) { //exit
         changeGameState(LOBBY);
       }
-      if (isButtonPressed(0)) { //reset ?
+      if (isButtonPressed(2)) { //reset ?
         changeGameState(OPTIONS_ASK_RESET);
+      }
+      if (isButtonPressed(0)) { //sound ?
+        changeGameState(OPTIONS_ASK_SOUND);
       }
       break;
     case OPTIONS_ASK_RESET:
@@ -101,10 +111,19 @@ void loop() {
         changeGameState(OPTIONS);
       }
       break;
+    case OPTIONS_ASK_SOUND:
+      if (isButtonPressed(2)) {
+        sound = true;
+        changeGameState(OPTIONS);
+      } else if (isButtonPressed(3)) {
+        sound = false;
+        changeGameState(OPTIONS);
+      }
+      break;
     case LOBBY:
       if (random(0,400000) == 0) {
         allOn();
-        tone(PIN_SPEAKER, tones[random(0,sizeof(tones)/sizeof(int))]);
+        if (sound) tone(PIN_SPEAKER, tones[random(0,sizeof(tones)/sizeof(int))]);
         delay(500);
         noTone(PIN_SPEAKER);
         stopLeds();
@@ -191,9 +210,8 @@ void loop() {
       }
       break;
     case GAME_OVER:
-      Serial.println("AAAAAA");
       gameOver();
-     changeGameState(LOBBY);
+      changeGameState(LOBBY);
       break;
   }
 }
@@ -206,11 +224,21 @@ bool isButtonPressed(byte button) {
   return bitRead(buttonPressStates, button) == 1;
 }
 
+void resetButtonStates() {
+  for (int i = 0; i < sizeof(buttons)/sizeof(button); i++) {
+    //ready
+    bitSet(buttonReadyStates, i);
+    //not pressed
+    buttonPressStates = bitClear(buttonPressStates, i);
+  }
+}
+
 bool areAllButtonPressed() {
   int count = 0;
   for (int i = 0; i < sizeof(buttons)/sizeof(button); i++) {
     if (digitalRead(buttons[i].pin)) count ++;
   }
+  if (count > 0) Serial.println(count);
   return count == sizeof(buttons)/sizeof(button);
 }
 
@@ -279,14 +307,24 @@ void changeGameState(gameStates newState) {
     case OPTIONS_ASK_RESET:
       u8x8.clear();
       u8x8.setFont(u8x8_font_chroma48medium8_r);
-      u8x8.drawString(0,0,"CONFIRM ?");
+      u8x8.drawString(0,0,"RESET ?");
+      u8x8.drawString(0,1,"B-YES R-NO");
+      break;
+    case OPTIONS_ASK_SOUND:
+      u8x8.clear();
+      u8x8.setFont(u8x8_font_chroma48medium8_r);
+      u8x8.drawString(0,0,"SOUND ?");
       u8x8.drawString(0,1,"B-YES R-NO");
       break;
     case OPTIONS:
+      noTone(PIN_SPEAKER);
       u8x8.clear();
       u8x8.setFont(u8x8_font_chroma48medium8_r);
       u8x8.drawString(0,0,"OPTIONS");
-      u8x8.drawString(0,1,"B-YES R-NO");
+      u8x8.drawString(0,1,"B-RESET");
+      u8x8.drawString(0,2,"Y-SOUND");
+      u8x8.drawString(0,3,"R-EXIT");
+      delay(2000);
       break;
     case LOBBY:
       record = EEPROM.read(0);
@@ -321,13 +359,13 @@ void changeGameState(gameStates newState) {
   }
 }
 
-void ledOn(int ledIndex, bool sound){
+void ledOn(int ledIndex, bool executeSound){
   button b = buttons[ledIndex];
   Wire.beginTransmission(0x20);
   Wire.write(b.ledSignal);
   Wire.endTransmission();
-  if (sound) {
-    tone(PIN_SPEAKER, b.tone);
+  if (executeSound) {
+    if (sound) tone(PIN_SPEAKER, b.tone);
   }
   playingStart();
 }
@@ -340,7 +378,7 @@ void allOn() {
 
 void playerTimeOutEffect() {
   allOn();
-  tone(PIN_SPEAKER, tones[4]);
+  if (sound) tone(PIN_SPEAKER, tones[4]);
 }
 
 void startMatchEffect() {
@@ -365,7 +403,7 @@ void gameOver() {
 
  for (byte thisNote = 0; thisNote < sizeof(melody)/sizeof(byte); thisNote++) {
     noteDuration = 1000/noteDurations[thisNote];
-    tone(PIN_SPEAKER, melody[thisNote],noteDuration);
+    if (sound) tone(PIN_SPEAKER, melody[thisNote],noteDuration);
     if (melody[thisNote] > 0) {
       rotateAnimation();
     }
