@@ -19,7 +19,8 @@ enum gameStates {
                   GAME_OVER,
                   OPTIONS,
                   OPTIONS_ASK_RESET,
-                  OPTIONS_ASK_SOUND
+                  OPTIONS_ASK_SOUND,
+                  INSERT_NAME
                 };
 
 
@@ -53,6 +54,10 @@ U8X8_SSD1306_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
 uint8_t record;
 
 bool sound;
+
+byte nameIndex;
+char nameLetter;
+String recordName;
 
 void setup() {
   Wire.begin();
@@ -106,6 +111,9 @@ void loop() {
       if (isButtonPressed(2)) {
         record = 0;
         EEPROM.write(0,record);
+        EEPROM.write(1, 0);
+        EEPROM.write(2, 0);
+        EEPROM.write(3, 0);
         changeGameState(OPTIONS);
       } else if (isButtonPressed(3)) {
         changeGameState(OPTIONS);
@@ -141,11 +149,6 @@ void loop() {
       }
       break;
     case SEQUENCE_CREATE_UPDATE:
-      Serial.print("level ");
-      Serial.print(level);
-      Serial.print(" - ");
-      Serial.println(500 - penalty(500) + 100);
-
       for (int n = level - 1; n < sizeof(gameSequence)/sizeof(byte); n++) {
         if (n < level) {
           gameSequence[n] = randomButton();
@@ -200,7 +203,15 @@ void loop() {
                   playerPlayingIndex ++;
                   buttonPressedFound = true;
                 } else {
-                  changeGameState(GAME_OVER);
+                  if (level > record) {
+                    record = level;
+                    nameLetter = 'A';
+                    recordName = "";
+                    changeGameState(INSERT_NAME);
+                    rewriteName();
+                  } else {
+                    changeGameState(GAME_OVER);
+                  }
                 }
               }  
               i ++;
@@ -213,8 +224,38 @@ void loop() {
       gameOver();
       changeGameState(LOBBY);
       break;
+    case INSERT_NAME:
+      if (isButtonPressed(0)) { //BACK
+        if (recordName.length() > 0) {
+            recordName.remove(recordName.length() - 1); 
+        }
+        rewriteName();
+      } else if (isButtonPressed(1)) { //prev LETTER
+        if (nameLetter > 'A') nameLetter --;
+        rewriteName();
+      } else if (isButtonPressed(2)) { //CONFIRM
+        if (recordName.length() < 3) {
+          recordName += nameLetter;
+          rewriteName();
+        } else {
+          saveRecord();
+          changeGameState(LOBBY);
+        }
+      } else if (isButtonPressed(3)) { //next LETTER
+        if (nameLetter < 'Z') nameLetter ++;
+        rewriteName();
+      }
+      break;
   }
 }
+
+void saveRecord() {
+  EEPROM.write(0,record);
+  EEPROM.write(1,recordName.charAt(0));
+  EEPROM.write(2,recordName.charAt(1));
+  EEPROM.write(3,recordName.charAt(2));
+}
+
 
 byte randomButton() {
   return (byte) random(0, 4);
@@ -297,6 +338,14 @@ void playerWaitingStart() {
   timerPlayerWaiting = millis();
 }
 
+void rewriteName() {
+  u8x8.clear();
+  u8x8.setFont(u8x8_font_chroma48medium8_r);
+  u8x8.drawString(0,0,"RECORD");
+  u8x8.drawString(0,1,recordName.c_str());
+  u8x8.drawString(0,2,String(nameLetter).c_str());
+}
+
 void changeGameState(gameStates newState) {
   Serial.print("from ");
   Serial.print(gameState);
@@ -307,7 +356,7 @@ void changeGameState(gameStates newState) {
     case OPTIONS_ASK_RESET:
       u8x8.clear();
       u8x8.setFont(u8x8_font_chroma48medium8_r);
-      u8x8.drawString(0,0,"RESET ?");
+      u8x8.drawString(0,0,"RESET RECORD ?");
       u8x8.drawString(0,1,"B-YES R-NO");
       break;
     case OPTIONS_ASK_SOUND:
@@ -322,13 +371,17 @@ void changeGameState(gameStates newState) {
       u8x8.clear();
       u8x8.setFont(u8x8_font_chroma48medium8_r);
       u8x8.drawString(0,0,"OPTIONS");
-      u8x8.drawString(0,1,"B-RESET");
+      u8x8.drawString(0,1,"B-RESET RECORD");
       u8x8.drawString(0,2,"Y-SOUND");
       u8x8.drawString(0,3,"R-EXIT");
       delay(2000);
       break;
     case LOBBY:
       record = EEPROM.read(0);
+      recordName = "";
+      recordName += (char) EEPROM.read(1);
+      recordName += (char) EEPROM.read(2);
+      recordName += (char) EEPROM.read(3);
       level = 1;
       u8x8.clear();
       u8x8.setFont(u8x8_font_chroma48medium8_r);
@@ -344,18 +397,17 @@ void changeGameState(gameStates newState) {
       u8x8.setFont(u8x8_font_chroma48medium8_r);
       u8x8.drawString(0,0,(((String) "Level  ") + level).c_str ());
       u8x8.drawString(0,1,(((String) "Record ") + record).c_str () );
+      u8x8.drawString(0,2,(((String) "By ") + recordName).c_str () );
       break;
     case PLAYER_WAITING:
       playerPlayingIndex = 0;
       break;
     case GAME_OVER:
-      if (level > record) {
-        record = level;
-        EEPROM.write(0,record);
-      }
       u8x8.clear();
       u8x8.setFont(u8x8_font_chroma48medium8_r);
       u8x8.drawString(0,0,"GAME OVER !");
+      break;
+    case INSERT_NAME:
       break;
   }
 }
