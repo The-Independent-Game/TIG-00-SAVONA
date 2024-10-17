@@ -1,5 +1,6 @@
 TIG-00
 ======
 
-First project :)
+[Follow us](https://linktr.ee/TheIndependentGame)
 
+![foto](foto.jpg)
