@@ -279,7 +279,6 @@ bool areAllButtonPressed() {
   for (int i = 0; i < sizeof(buttons)/sizeof(button); i++) {
     if (digitalRead(buttons[i].pin)) count ++;
   }
-  if (count > 0) Serial.println(count);
   return count == sizeof(buttons)/sizeof(button);
 }
 
