@@ -207,6 +207,10 @@ void loop() {
                     record = level;
                     nameLetter = 'A';
                     recordName = "";
+                    u8x8.clear();
+                    u8x8.setFont(u8x8_font_chroma48medium8_r);
+                    u8x8.drawString(0,0,"!! NEW RECORD !!");
+                    endGameMelody();
                     changeGameState(INSERT_NAME);
                     rewriteName();
                   } else {
@@ -221,7 +225,7 @@ void loop() {
       }
       break;
     case GAME_OVER:
-      gameOver();
+      endGameMelody();
       changeGameState(LOBBY);
       break;
     case INSERT_NAME:
@@ -340,7 +344,7 @@ void playerWaitingStart() {
 void rewriteName() {
   u8x8.clear();
   u8x8.setFont(u8x8_font_chroma48medium8_r);
-  u8x8.drawString(0,0,"RECORD");
+  u8x8.drawString(0,0,"INSERT NAME");
   u8x8.drawString(0,1,recordName.c_str());
   u8x8.drawString(0,2,String(nameLetter).c_str());
 }
@@ -385,7 +389,11 @@ void changeGameState(gameStates newState) {
       u8x8.clear();
       u8x8.setFont(u8x8_font_chroma48medium8_r);
       u8x8.drawString(0,0,"TIG-00");
-      u8x8.drawString(0,1,"Press a button");
+      u8x8.drawString(0,2,"Press a button");
+      if (record > 0) {
+        u8x8.drawString(0,4,(((String) "Record ") + record).c_str () );
+        u8x8.drawString(0,5,(((String) "By ") + recordName).c_str () );
+      }
       break;
     case SEQUENCE_PRESENTING:
       presentingIndex = -1;
@@ -395,8 +403,10 @@ void changeGameState(gameStates newState) {
       u8x8.clear();
       u8x8.setFont(u8x8_font_chroma48medium8_r);
       u8x8.drawString(0,0,(((String) "Level  ") + level).c_str ());
-      u8x8.drawString(0,1,(((String) "Record ") + record).c_str () );
-      u8x8.drawString(0,2,(((String) "By ") + recordName).c_str () );
+      if (record > 0) {
+        u8x8.drawString(0,2,(((String) "Record ") + record).c_str () );
+        u8x8.drawString(0,3,(((String) "By ") + recordName).c_str () );
+      }
       break;
     case PLAYER_WAITING:
       playerPlayingIndex = 0;
@@ -406,7 +416,7 @@ void changeGameState(gameStates newState) {
       u8x8.setFont(u8x8_font_chroma48medium8_r);
       u8x8.drawString(0,0,"GAME OVER !");
       break;
-    case INSERT_NAME:
+    default:
       break;
   }
 }
@@ -444,7 +454,7 @@ void stopLeds() {
   noTone(PIN_SPEAKER);
 }
 
-void gameOver() {
+void endGameMelody() {
 
   byte melody[] = { 250, 196, 196, 220, 196,0, 247, 250};
 
